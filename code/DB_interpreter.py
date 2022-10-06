@@ -3,6 +3,25 @@ import pandas as pd
 import config
 import numpy as np
 
+def merging_groups(df, col, values_to_replace):
+    """ Overwrites values in a given col, here to fuse groups
+
+                Parameters
+                ----------
+               df : pandas dataframe,
+                    Initial dataframe
+                col: string,
+                    Name of the column of the split
+                values_to_replace : dict
+                a dict with keys the values to replace and as value the value of replacement
+                Returns
+                df : the same dataframe but with updated values in col
+                """
+    for index, row in df.iterrows():
+        if list(values_to_replace.keys()).__contains__(str(df[col][index])):
+            df[col][index] = values_to_replace[str(df[col][index])]
+    return df
+
 def split_database_col(df,col):
     """ Generates n smaller df from an initial df for each n different values of column col. Must be used for
     categorical col
@@ -53,6 +72,10 @@ if __name__ == "__main__":
     FILENAME = os.path.join(DIRECTORY, "sarah_michiels_v2.csv")
     # Avoiding path issues related to different OS
     data = pd.read_csv(FILENAME, sep=",", encoding="latin1")
+
+    #Regrouping naps groups in 3 groups : worsens, improves and nothing changes
+    data = merging_groups(data, "InflNap", {"-2" : -1, "2" : 1})
+
     dic_df = split_database_col(data, "InflNap")
     print(list(data.keys()))
     num_cols = config.SM_num_cols
