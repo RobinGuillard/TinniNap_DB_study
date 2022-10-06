@@ -22,10 +22,12 @@ def split_database_col(df,col):
     return dic_df
 
 
+
+
 if __name__ == "__main__":
-    DIRECTORY = "D:\Documents\Siopi\siopi-ML\data\processed"
-    FILENAME = os.path.join(DIRECTORY, "BDD_Loche_V3.csv")
+    DIRECTORY = "D:\Documents\Thèse EDISCE\TinniNap_DB_study\data"
+    FILENAME = os.path.join(DIRECTORY, "sarah_michiels_v2.csv")
     # Avoiding path issues related to different OS
     data = pd.read_csv(FILENAME, sep=",", encoding="latin1")
-    dic_df = split_database_col(data, "fatigue")
-    print(dic_df[0]["fatigue"])
+    dic_df = split_database_col(data, "Female")
+    print(list(data.keys()))
