@@ -28,7 +28,7 @@ SM_already_categorical=['Female', 'cause_Allergy to something', 'cause_Barotraum
            'TinType_A static noise', 'TinType_Clicking', 'TinType_Intermittent beeping (morse code)',
            'TinType_A whooshing noise - pulsatile', 'TinType_A whooshing noise - not in time with the pulse',
            'TinType_A pulsating sound', 'TinType_Other',  'InflStress', 'InflAnxiety', 'InflGoodSleep', 'InflBadSleep',
-            'InflIntenseworkout', 'InflModerateWorkout', 'InflLightEx']
+            'InflIntenseworkout', 'InflModerateWorkout', 'InflLightEx', "Fluctuations"]
 SM_cols_categ_radio = [['HearingLoss_Severe0', 'HearingLoss_Severe1', 'HearingLoss_Severe3',
            'HearingLoss_Severe4'], ['Fluctuations_On_off', 'Fluctuations_GrowsLouder', 'Fluctuations_GrowsQuieter',
            'Fleeting tinnitus'],
