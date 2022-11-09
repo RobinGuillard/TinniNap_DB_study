@@ -147,9 +147,9 @@ def create_feature_set_of_rows_num(col, dic_cols, np2):
     return set_of_rows, dic_cols[col]["pval"]
 
 def create_feature_set_of_rows_cat(col, dic_df, data, dic_crosstab):
+
     nb_split = len(list(dic_df.keys()))
     if len(data[col].unique()) == 2 or col =="Female": #attention hardcoded mauvaise gestion des nan
-
         set_of_rows = []
         first_row = [col]
         Yes_line = ["Yes"]
@@ -178,11 +178,53 @@ def create_feature_set_of_rows_cat(col, dic_df, data, dic_crosstab):
         set_of_rows.append(missing_line)
         #print(set_of_rows)
         return set_of_rows, dic_crosstab[col][-2]
-    else:
-        return 0,0
+
+    else: #case for the non-binary columns
+        print(col)
+        choices = sorted(list(data[col].unique()))
+        print(choices)
+        print()
+        print(dic_crosstab[col])
+        print(len(dic_crosstab[col]))
+
+        set_of_rows = []
+        first_row = [col]
+        print(int((len(dic_crosstab[col]) - 6 )/ 3))
+        many_line = [[str(choices[i])] for i in range(int((len(dic_crosstab[col]) - 6 )/ 3))]
+        missing_line = ["Missing", "0 (100%)","0 (100%)","0 (100%)"]
+
+
+
+        for i in range(nb_split):
+            first_row.append("")
+            denoms=0
+            for var in range(int((len(dic_crosstab[col]) - 6 )/ 3)):
+                denoms+=dic_crosstab[col][i+var*3]
+            for var in range(int((len(dic_crosstab[col]) - 6 )/ 3)):
+                many_line[var].append(str(dic_crosstab[col][i+var*3]) + " (" + str(
+                    round(dic_crosstab[col][i+var*3] * 100 / (denoms),
+                          1)) + "%)")
+
+
+        first_row.append("Chi2(***) = " + str(round(dic_crosstab[col][-3], 1)))
+        if dic_crosstab[col][-2] < 0.05:
+            first_row[-1] = first_row[-1] + "*"
+
+        first_row.append(round(dic_crosstab[col][-1], 3))
+        for i in range(2):
+            for var in range(int((len(dic_crosstab[col]) - 6) / 3)):
+                many_line[var].append("")
+
+            missing_line.append("")
+        set_of_rows.append(first_row)
+        set_of_rows.extend(many_line)
+        set_of_rows.append(missing_line)
+        print(set_of_rows)
+        return set_of_rows, dic_crosstab[col][-2]
 
 
 if __name__ == "__main__":
+    split_variable = "InflGoodSleep"
     DIRECTORY = "D:\Documents\Thèse EDISCE\TinniNap_DB_study\data"
     FILENAME = os.path.join(DIRECTORY, "sarah_michiels_v3_with_missing.csv")
     # Avoiding path issues related to different OS
@@ -201,40 +243,19 @@ if __name__ == "__main__":
     num_cols = config.SM_num_cols
     cat_cols = config.SM_already_categorical
 
-    #
-    #for elm in cat_cols:
-    #    print(elm)
-    #    for var in data[elm].unique():
-    #        print(var)
 
-
-    dic_df = split_database_col(data, "InflNap")
-
+    #extracting datas for numerical cols
+    dic_df = split_database_col(data, split_variable)
     dic_cols = get_mean_std_num_cols(dic_df, num_cols)
-    #for i in range(3):
-    #     for elm in dic_cols:
-    #         print(dic_cols[elm]["order_vals"][i])
-    #         print(str(round(dic_cols[elm]["means"][i], 1)) + " (" + str(round(dic_cols[elm]["stds"][i], 2)) + ")")
-    #         print(str(dic_cols[elm]["medians"][i]) + " [" + str(dic_cols[elm]["mins"][i]) + ", " +
-    #               str(dic_cols[elm]["maxs"][i]) + "]" )
-    #
 
+    # extracting datas for cat cols
+    dic_crosstab = prepare_chi_squared(data, cat_cols, split_variable)
 
-    #     print()
-    #     print()
-    #
-    #
-    # for elm in num_cols:
-    #
-    #     print( str(round(get_anova_and_eta_squared(data, elm, "InflNap")["np2"].values[0], 3)))
-    #     print()
-    #     print()
-    dic_crosstab = prepare_chi_squared(data, cat_cols, "InflNap")
-
+    #Creating and completing table for csv export
     table=[["", "Worsens (N= 1404 )",	"Improves (N= 507 )",	"No effect (N= 4204 )",	"Statistic",	"Effect size"]]
     li_pvals=[]
     for col in num_cols:
-        next_line, p_val = create_feature_set_of_rows_num(col, dic_cols, get_anova_and_eta_squared(data, col, "InflNap"))
+        next_line, p_val = create_feature_set_of_rows_num(col, dic_cols, get_anova_and_eta_squared(data, col, split_variable))
         table.extend(next_line)
         li_pvals.append(p_val)
     for col in cat_cols:
@@ -244,21 +265,17 @@ if __name__ == "__main__":
             table.extend(next_line)
             li_pvals.append(p_val)
 
-print(li_pvals)
-print(len(li_pvals))
-p_bool, p_adj, p_Sidak, p_alpha_adj = multipletests(li_pvals, alpha=0.05, method='holm')
-print("p-adj")
-print(p_adj)
-print(p_bool)
-print(len(p_adj))
-count_p=0
-for row in table:
-    if row[-2]!="" and row[-2]!="Statistic":
-        if p_bool[count_p]:
-            row[-2]=row[-2]+"*"
-        count_p+=1
-#print(sum(p_bool))
-os.chdir("D:/Documents/Thèse EDISCE/TinniNap_DB_study/figures")
-with open("table.csv", "w", newline="") as f:
-    writer = csv.writer(f)
-    writer.writerows(table)
+    #Dealing with holm correction
+    p_bool, p_adj, p_Sidak, p_alpha_adj = multipletests(li_pvals, alpha=0.05, method='holm')
+    count_p=0
+    for row in table:
+        if row[-2]!="" and row[-2]!="Statistic":
+            if p_bool[count_p]:
+                row[-2]=row[-2]+"*"
+            count_p+=1
+
+    #saving csv
+    os.chdir("D:/Documents/Thèse EDISCE/TinniNap_DB_study/figures")
+    with open(split_variable+"_table.csv", "w", newline="") as f:
+        writer = csv.writer(f)
+        writer.writerows(table)
