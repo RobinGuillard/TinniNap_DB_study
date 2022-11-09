@@ -5,6 +5,7 @@ import numpy as np
 import scipy.stats as stats
 import pingouin
 import csv
+from statsmodels.sandbox.stats.multicomp import multipletests
 
 
 
@@ -51,24 +52,31 @@ def get_anova_and_eta_squared(df, num_col, ref_col):
     return pingouin.anova(data=df, dv=num_col, between=ref_col, effsize="np2")["np2"][0]
 
 def prepare_chi_squared(df, cat_cols, ref_col):
-    crosstabs = []
+
+    dic_output={}
     for col in cat_cols:
         crosstab = pd.crosstab(df[col], df[ref_col], margins=True)
         ind1 = len(df[col].unique())
         ind2 = len(df[ref_col].unique())
-        crosstabs.append(crosstab)
 
+        missing = [0,0,0]
 
+        if (col == "Female"):
+            ind1 = ind1-1  #car il y a des np.nan dans unique()
+            missing = [9, 19, 8]
         value = np.array([crosstab.iloc[i][0:ind2].values for i in range(ind1)]) #attention hardcoded
-        #print(col)
+
         chi2 = stats.chi2_contingency(value)
-        print(crosstab)
-        #print("chi-squared test results (stat, pval, df) : " + str(chi2[0:3]))
-        #print(len(df))
+        #print(chi2)
+
         cramerV = np.sqrt(chi2[0]/(chi2[2]*len(df)))   # source : https://www.statology.org/effect-size-chi-square/
-        #print("cramerV " + str(cramerV))
-        print()
-    return 0
+        dic_output[col] = [value[i][j] for i in range(len(value)) for j in range(len(value[0])) ]
+        dic_output[col].extend(missing)
+        dic_output[col].append(chi2[0])#Stat
+        dic_output[col].append(chi2[1])#p-val
+        dic_output[col].append(cramerV)
+
+    return dic_output
 
 def get_mean_std_num_cols(dic_df, num_cols):
     """ Generates n smaller df from an initial df for each n different values of column col. Must be used for
@@ -96,7 +104,6 @@ def get_mean_std_num_cols(dic_df, num_cols):
             dic_cols[col]["mins"].append(np.min(dic_df[X][col].dropna()))
             dic_cols[col]["maxs"].append(np.max(dic_df[X][col].dropna()))
             missing = dic_df[X][col].isnull().sum()
-            print(missing)
             dic_cols[col]["missing"].append(missing)
             dic_cols[col]["perc"].append((len(dic_df[X][col])-missing)*100/len(dic_df[X][col]))
             li_df.append(dic_df[X][col].dropna())
@@ -110,6 +117,7 @@ def get_mean_std_num_cols(dic_df, num_cols):
 
 def create_feature_set_of_rows_num(col, dic_cols, np2):
     nb_split = len(dic_cols[col]["order_vals"])
+
     good_order = np.argsort(dic_cols[col]["order_vals"]) #should give the good order to parse the datas
     #print(good_order)
     set_of_rows = []
@@ -126,7 +134,6 @@ def create_feature_set_of_rows_num(col, dic_cols, np2):
     first_row.append("F(***) = " + str(round(dic_cols[col]["F-stat"],1)))
     if dic_cols[col]["pval"] < 0.05:
         first_row[-1] = first_row[-1] +"*"
-
     first_row.append(round(np2,3))
     for i in range(2):
         mean_line.append("")
@@ -136,8 +143,43 @@ def create_feature_set_of_rows_num(col, dic_cols, np2):
     set_of_rows.append(mean_line)
     set_of_rows.append(median_line)
     set_of_rows.append(missing_line)
-    print(set_of_rows)
-    return set_of_rows
+    #print(set_of_rows)
+    return set_of_rows, dic_cols[col]["pval"]
+
+def create_feature_set_of_rows_cat(col, dic_df, data, dic_crosstab):
+    nb_split = len(list(dic_df.keys()))
+    if len(data[col].unique()) == 2 or col =="Female": #attention hardcoded mauvaise gestion des nan
+
+        set_of_rows = []
+        first_row = [col]
+        Yes_line = ["Yes"]
+        No_line =["No"]
+        missing_line=["Missing"]
+        for i in range(nb_split):
+            first_row.append("")
+            Yes_line.append(str(dic_crosstab[col][i+nb_split]) + " (" + str(round(dic_crosstab[col][i+nb_split]*100/(dic_crosstab[col][i+nb_split]+dic_crosstab[col][i]), 1)) + "%)")
+            No_line.append(str(dic_crosstab[col][i]) + " (" + str(round(dic_crosstab[col][i]*100/(dic_crosstab[col][i+nb_split]+dic_crosstab[col][i]), 1)) + "%)")
+            #print(dic_crosstab[col])
+            perc = dic_crosstab[col][i+2*nb_split]*100/(dic_crosstab[col][i+2*nb_split]+ dic_crosstab[col][i] + dic_crosstab[col][i+nb_split])
+            #print(perc)
+            missing_line.append(str(dic_crosstab[col][i+2*nb_split]) + " (" + str(round(perc,1))+"%)")
+        first_row.append("Chi2(***) = " + str(round(dic_crosstab[col][-3],1)))
+        if dic_crosstab[col][-2] < 0.05:
+            first_row[-1] = first_row[-1] +"*"
+
+        first_row.append(round(dic_crosstab[col][-1],3))
+        for i in range(2):
+            Yes_line.append("")
+            No_line.append("")
+            missing_line.append("")
+        set_of_rows.append(first_row)
+        set_of_rows.append(Yes_line)
+        set_of_rows.append(No_line)
+        set_of_rows.append(missing_line)
+        #print(set_of_rows)
+        return set_of_rows, dic_crosstab[col][-2]
+    else:
+        return 0,0
 
 
 if __name__ == "__main__":
@@ -155,6 +197,7 @@ if __name__ == "__main__":
     data = merging_groups(data, "InflGoodSleep", {"-2": -1, "2": 1})
     data = merging_groups(data, "InflAnxiety", {"-2": -1, "2": 1})
     data = merging_groups(data, "InflStress", {"-2": -1, "2": 1})
+    data = merging_groups(data, "Female", {"2.0": np.nan})
     num_cols = config.SM_num_cols
     cat_cols = config.SM_already_categorical
 
@@ -162,7 +205,7 @@ if __name__ == "__main__":
     #for elm in cat_cols:
     #    print(elm)
     #    for var in data[elm].unique():
-    #        print()
+    #        print(var)
 
 
     dic_df = split_database_col(data, "InflNap")
@@ -186,14 +229,35 @@ if __name__ == "__main__":
     #     print( str(round(get_anova_and_eta_squared(data, elm, "InflNap")["np2"].values[0], 3)))
     #     print()
     #     print()
-    #get_it = prepare_chi_squared(data, cat_cols, "InflNap")
+    dic_crosstab = prepare_chi_squared(data, cat_cols, "InflNap")
 
     table=[["", "Worsens (N= 1404 )",	"Improves (N= 507 )",	"No effect (N= 4204 )",	"Statistic",	"Effect size"]]
-
+    li_pvals=[]
     for col in num_cols:
-        table.extend(create_feature_set_of_rows_num(col, dic_cols, get_anova_and_eta_squared(data, col, "InflNap")))
-    print(table)
+        next_line, p_val = create_feature_set_of_rows_num(col, dic_cols, get_anova_and_eta_squared(data, col, "InflNap"))
+        table.extend(next_line)
+        li_pvals.append(p_val)
+    for col in cat_cols:
+        #print(col)
+        next_line, p_val=create_feature_set_of_rows_cat(col, dic_df, data, dic_crosstab)
+        if next_line!=0:
+            table.extend(next_line)
+            li_pvals.append(p_val)
 
+print(li_pvals)
+print(len(li_pvals))
+p_bool, p_adj, p_Sidak, p_alpha_adj = multipletests(li_pvals, alpha=0.05, method='holm')
+print("p-adj")
+print(p_adj)
+print(p_bool)
+print(len(p_adj))
+count_p=0
+for row in table:
+    if row[-2]!="" and row[-2]!="Statistic":
+        if p_bool[count_p]:
+            row[-2]=row[-2]+"*"
+        count_p+=1
+print(sum(p_bool))
 os.chdir("D:/Documents/Thèse EDISCE/TinniNap_DB_study/figures")
 with open("table.csv", "w", newline="") as f:
     writer = csv.writer(f)
