@@ -257,7 +257,7 @@ for row in table:
         if p_bool[count_p]:
             row[-2]=row[-2]+"*"
         count_p+=1
-print(sum(p_bool))
+#print(sum(p_bool))
 os.chdir("D:/Documents/Thèse EDISCE/TinniNap_DB_study/figures")
 with open("table.csv", "w", newline="") as f:
     writer = csv.writer(f)
