@@ -2,7 +2,7 @@ import os
 import pandas as pd
 
 SM_num_cols = ['TimeTin-months', 'Age', 'MeanLoudness', 'MinLoudness', 'MaxLoudness', 'CurrLoudness', 'MeanAnnoyancePastWeek',
-           'MinAnnoyanceGoodDay', 'MaxAnnoyanceBadDay', 'CurrAnnoyance', 'AwarenessOpenEnded']
+           'MinAnnoyanceGoodDay', 'MaxAnnoyanceBadDay', 'CurrAnnoyance', 'AwarenessOpenEnded', "Fleeting tinnitus"]
 SM_already_categorical=['Female', 'cause_Allergy to something', 'cause_Barotrauma - air / water pressure', 'cause_Dental treatment',
            'cause_Otosclerosis', 'cause_Ear wax procedure (syringing, candling or other related procedure)',
            'cause_Eustachian tube dysfunction', 'cause_Metabolic (diabetes, thyroid, B12, hyperlipidaemia etc.)',

@@ -134,8 +134,9 @@ def create_feature_set_of_rows_num(col, dic_cols, np2):
     first_row.append("F(***) = " + str(round(dic_cols[col]["F-stat"],1)))
     if dic_cols[col]["pval"] < 0.05:
         first_row[-1] = first_row[-1] +"*"
+    first_row.append(dic_cols[col]["pval"])
     first_row.append(round(np2,3))
-    for i in range(2):
+    for i in range(3):
         mean_line.append("")
         median_line.append("")
         missing_line.append("")
@@ -164,11 +165,13 @@ def create_feature_set_of_rows_cat(col, dic_df, data, dic_crosstab):
             #print(perc)
             missing_line.append(str(dic_crosstab[col][i+2*nb_split]) + " (" + str(round(perc,1))+"%)")
         first_row.append("Chi2(***) = " + str(round(dic_crosstab[col][-3],1)))
+
         if dic_crosstab[col][-2] < 0.05:
             first_row[-1] = first_row[-1] +"*"
-
+        first_row.append(dic_crosstab[col][-2])
         first_row.append(round(dic_crosstab[col][-1],3))
-        for i in range(2):
+
+        for i in range(3):
             Yes_line.append("")
             No_line.append("")
             missing_line.append("")
@@ -209,9 +212,9 @@ def create_feature_set_of_rows_cat(col, dic_df, data, dic_crosstab):
         first_row.append("Chi2(***) = " + str(round(dic_crosstab[col][-3], 1)))
         if dic_crosstab[col][-2] < 0.05:
             first_row[-1] = first_row[-1] + "*"
-
+        first_row.append(dic_crosstab[col][-2])
         first_row.append(round(dic_crosstab[col][-1], 3))
-        for i in range(2):
+        for i in range(3):
             for var in range(int((len(dic_crosstab[col]) - 6) / 3)):
                 many_line[var].append("")
 
@@ -224,7 +227,7 @@ def create_feature_set_of_rows_cat(col, dic_df, data, dic_crosstab):
 
 
 if __name__ == "__main__":
-    split_variable = "InflGoodSleep"
+    split_variable = "InflNap"
     DIRECTORY = "D:\Documents\Thèse EDISCE\TinniNap_DB_study\data"
     FILENAME = os.path.join(DIRECTORY, "sarah_michiels_v3_with_missing.csv")
     # Avoiding path issues related to different OS
@@ -252,7 +255,7 @@ if __name__ == "__main__":
     dic_crosstab = prepare_chi_squared(data, cat_cols, split_variable)
 
     #Creating and completing table for csv export
-    table=[["", "Worsens (N= 1404 )",	"Improves (N= 507 )",	"No effect (N= 4204 )",	"Statistic",	"Effect size"]]
+    table=[["", "Worsens (N= "+str(len(dic_df[-1]))+ " )",	"No effect (N= "+str(len(dic_df[0]))+" )", "Improves (N= "+str(len(dic_df[1]))+" )",	"Statistic", "P-Value",	"Effect size"]]
     li_pvals=[]
     for col in num_cols:
         next_line, p_val = create_feature_set_of_rows_num(col, dic_cols, get_anova_and_eta_squared(data, col, split_variable))
@@ -269,9 +272,10 @@ if __name__ == "__main__":
     p_bool, p_adj, p_Sidak, p_alpha_adj = multipletests(li_pvals, alpha=0.05, method='holm')
     count_p=0
     for row in table:
-        if row[-2]!="" and row[-2]!="Statistic":
+        if row[-3]!="" and row[-3]!="Statistic":
             if p_bool[count_p]:
-                row[-2]=row[-2]+"*"
+                row[-3]=row[-3]+"*"
+            row[-2] = p_adj[count_p] #replaces the p-vals by the corrected p-values
             count_p+=1
 
     #saving csv
