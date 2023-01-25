@@ -28,7 +28,7 @@ def merging_groups(df, col, values_to_replace):
             df[col][index] = values_to_replace[str(df[col][index])]
     return df
 
-def split_database_col(df,col):
+def split_database_col(df,col, exclude=[]):
     """ Generates n smaller df from an initial df for each n different values of column col. Must be used for
     categorical col
 
@@ -38,12 +38,17 @@ def split_database_col(df,col):
             Initial dataframe
         col: string,
             Name of the column of the split
+        exclude : optional
+            Values to exclude from the split
         Returns
         dic_df : python dictionnary
         a dictionnary where the keys are the split col values and the values are the partial databases
         """
     dic_df = {}
-    keys = df[col].unique()
+    keys = list(df[col].unique())
+    if len(exclude)>0:
+        for excl in exclude:
+            keys.remove(excl)
     for elm in keys :
         dic_df[elm] = df[df[col] == elm]
     return dic_df
@@ -227,46 +232,40 @@ def create_feature_set_of_rows_cat(col, dic_df, data, dic_crosstab):
 
 
 if __name__ == "__main__":
-    split_variable = "on_off_split"
+    split_variable = "tschq-nap"
     DIRECTORY = "D:\Documents\Thèse EDISCE\TinniNap_DB_study\data"
-    FILENAME = os.path.join(DIRECTORY, "sarah_michiels_v3_with_missing_with_true_on-off.csv")
+    FILENAME = os.path.join(DIRECTORY, "Jorge_data_clean.csv")
     # Avoiding path issues related to different OS
-    data = pd.read_csv(FILENAME, sep=",", encoding="latin1")
+    data = pd.read_csv(FILENAME, sep=";", encoding="latin1")
 
     #Regrouping naps groups in 3 groups : worsens, improves and nothing changes
-    data = merging_groups(data, "InflNap", {"-2" : -1, "2" : 1})
-    data = merging_groups(data, "InflLightEx", {"-2": -1, "2": 1})
-    data = merging_groups(data, "InflModerateWorkout", {"-2": -1, "2": 1})
-    data = merging_groups(data, "InflIntenseworkout", {"-2" : -1, "2" : 1})
-    data = merging_groups(data, "InflBadSleep", {"-2": -1, "2": 1})
-    data = merging_groups(data, "InflGoodSleep", {"-2": -1, "2": 1})
-    data = merging_groups(data, "InflAnxiety", {"-2": -1, "2": 1})
-    data = merging_groups(data, "InflStress", {"-2": -1, "2": 1})
-    data = merging_groups(data, "Female", {"2.0": np.nan})
-    num_cols = config.SM_num_cols
-    cat_cols = config.SM_already_categorical
+
+    num_cols = config.JS_num_cols
+    cat_cols = config.JS_already_categorical
 
 
     #extracting datas for numerical cols
-    dic_df = split_database_col(data, split_variable)
+    dic_df = split_database_col(data, split_variable, exclude=[3])
     dic_cols = get_mean_std_num_cols(dic_df, num_cols)
 
+
     # extracting datas for cat cols
-    dic_crosstab = prepare_chi_squared(data, cat_cols, split_variable)
+    #dic_crosstab = prepare_chi_squared(data, cat_cols, split_variable)
 
     #Creating and completing table for csv export
-    table=[["", "Worsens (N= "+str(len(dic_df[-1]))+ " )",	"No effect (N= "+str(len(dic_df[0]))+" )", "Improves (N= "+str(len(dic_df[1]))+" )",	"Statistic", "P-Value",	"Effect size"]]
+    table=[["", "Worsens (N= "+str(len(dic_df[0]))+ " )",	"No effect (N= "+str(len(dic_df[2]))+" )", "Improves (N= "+str(len(dic_df[1]))+" )",	"Statistic", "P-Value",	"Effect size"]]
+
     li_pvals=[]
     for col in num_cols:
         next_line, p_val = create_feature_set_of_rows_num(col, dic_cols, get_anova_and_eta_squared(data, col, split_variable))
         table.extend(next_line)
         li_pvals.append(p_val)
-    for col in cat_cols:
+    #for col in cat_cols:
         #print(col)
-        next_line, p_val=create_feature_set_of_rows_cat(col, dic_df, data, dic_crosstab)
-        if next_line!=0:
-            table.extend(next_line)
-            li_pvals.append(p_val)
+    #    next_line, p_val=create_feature_set_of_rows_cat(col, dic_df, data, dic_crosstab)
+    #    if next_line!=0:
+    #        table.extend(next_line)
+    #        li_pvals.append(p_val)
 
     #Dealing with holm correction
     p_bool, p_adj, p_Sidak, p_alpha_adj = multipletests(li_pvals, alpha=0.05, method='holm')
