@@ -95,7 +95,7 @@ def get_mean_std_num_cols(dic_df, num_cols):
     for col in num_cols:
         dic_cols[col] = { "order_vals":[],"means":[], "stds":[], "medians":[], "F-stat" : -1, "pval" : -1, "mins" : [], "maxs" : [], "missing":[], "perc":[]}
         li_df=[]
-
+        print(list(dic_df.keys()))
         for X in list(dic_df.keys()):
             dic_cols[col]["order_vals"].append(X)
             dic_cols[col]["means"].append(np.mean(dic_df[X][col].dropna()))

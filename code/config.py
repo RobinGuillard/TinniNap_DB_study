@@ -41,7 +41,14 @@ JS_num_cols = ['age', 'mdi_score', 'tfi_score', 'tfi_intrusive', 'tfi_sense_of_c
                'tq_score', 'whoqol_1', 'whoqol_2', 'whoqol_3', 'whoqol_4',  'ts_1', 'ts_2', 'ts_3', 'ts_4', 'ts_5',
                'ts_6', 'tschq-personal_loudness', 'tschq-months_onset',
                            'tschq-awareness_time', 'tschq-angerness_time', ]
-JS_already_categorical =  [ 'sex', 'mdi_1', 'mdi_2', 'mdi_3', 'mdi_4', 'mdi_5', 'mdi_6', 'mdi_7', 'mdi_8a',
+JS_categorical_essential = [ 'sex',  'tschq-psychiatry', 'tschq-neckpain',
+                           'tschq-tmj', 'tschq-vertigo', 'tschq-headache', 'tschq-noise-pain', 'tschq-hyperacusis',
+                           'tschq-ha', 'tschq-hearproblems', 'tschq-stress', 'tschq-sleep',
+                           'tschq-somatic', 'tschq-sounds-worsen-tinnitus', 'tschq-sounds-suppress-tinnitus',
+                           'tschq-n-treatments', 'tschq-tinpitch', 'tschq-tintype', 'tschq-fluctuations',
+                           'tschq-intermitent', 'tschq-pulsating', 'tschq-cause', 'tschq-innital-perception',
+                           'tschq-familiy' ]
+JS_already_categorical =  [ 'mdi_1', 'mdi_2', 'mdi_3', 'mdi_4', 'mdi_5', 'mdi_6', 'mdi_7', 'mdi_8a',
                            'mdi_8b', 'mdi_9', 'mdi_10a', 'mdi_10b',  'tfi_1', 'tfi_2', 'tfi_3', 'tfi_4',
                            'tfi_5', 'tfi_6', 'tfi_7', 'tfi_8', 'tfi_9', 'tfi_10', 'tfi_11', 'tfi_12', 'tfi_13',
                            'tfi_14', 'tfi_15', 'tfi_16', 'tfi_17', 'tfi_18', 'tfi_19', 'tfi_20', 'tfi_21', 'tfi_22',
@@ -53,10 +60,4 @@ JS_already_categorical =  [ 'sex', 'mdi_1', 'mdi_2', 'mdi_3', 'mdi_4', 'mdi_5', 
                            'tq_21', 'tq_22', 'tq_23', 'tq_24', 'tq_25', 'tq_26', 'tq_27', 'tq_28', 'tq_29', 'tq_30',
                            'tq_31', 'tq_32', 'tq_33', 'tq_34', 'tq_35', 'tq_36', 'tq_37', 'tq_38', 'tq_39', 'tq_40',
                            'tq_41', 'tq_42', 'tq_43', 'tq_44', 'tq_45', 'tq_46', 'tq_47', 'tq_48', 'tq_49', 'tq_50',
-                           'tq_51', 'tq_52',  'tschq-psychiatry', 'tschq-neckpain',
-                           'tschq-tmj', 'tschq-vertigo', 'tschq-headache', 'tschq-noise-pain', 'tschq-hyperacusis',
-                           'tschq-ha', 'tschq-hearproblems', 'tschq-stress', 'tschq-sleep',
-                           'tschq-somatic', 'tschq-sounds-worsen-tinnitus', 'tschq-sounds-suppress-tinnitus',
-                           'tschq-n-treatments', 'tschq-tinpitch', 'tschq-tintype', 'tschq-fluctuations',
-                           'tschq-intermitent', 'tschq-pulsating', 'tschq-cause', 'tschq-innital-perception',
-                           'tschq-familiy']
+                           'tq_51', 'tq_52']

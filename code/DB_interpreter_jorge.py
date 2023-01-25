@@ -100,8 +100,8 @@ def get_mean_std_num_cols(dic_df, num_cols):
     for col in num_cols:
         dic_cols[col] = { "order_vals":[],"means":[], "stds":[], "medians":[], "F-stat" : -1, "pval" : -1, "mins" : [], "maxs" : [], "missing":[], "perc":[]}
         li_df=[]
-
-        for X in list(dic_df.keys()):
+        keys = list(dic_df.keys())
+        for X in list(keys):
             dic_cols[col]["order_vals"].append(X)
             dic_cols[col]["means"].append(np.mean(dic_df[X][col].dropna()))
             dic_cols[col]["stds"].append(np.std(dic_df[X][col].dropna()))
@@ -112,7 +112,6 @@ def get_mean_std_num_cols(dic_df, num_cols):
             dic_cols[col]["missing"].append(missing)
             dic_cols[col]["perc"].append((len(dic_df[X][col])-missing)*100/len(dic_df[X][col]))
             li_df.append(dic_df[X][col].dropna())
-
         if len(li_df) == 3: #Beware : hardcoded
             dic_cols[col]["F-stat"], dic_cols[col]["pval"] = stats.f_oneway(li_df[0], li_df[1], li_df[2])
         if len(li_df) == 2: #Beware : hardcoded
@@ -123,7 +122,7 @@ def get_mean_std_num_cols(dic_df, num_cols):
 def create_feature_set_of_rows_num(col, dic_cols, np2):
     nb_split = len(dic_cols[col]["order_vals"])
 
-    good_order = np.argsort(dic_cols[col]["order_vals"]) #should give the good order to parse the datas
+    good_order = list(np.argsort(dic_cols[col]["order_vals"])) #should give the good order to parse the datas
     #print(good_order)
     set_of_rows = []
     first_row = [col]
@@ -135,7 +134,7 @@ def create_feature_set_of_rows_num(col, dic_cols, np2):
         mean_line.append(str(round(dic_cols[col]["means"][i], 1)) + " (" + str(round(dic_cols[col]["stds"][i], 2)) + ")")
         median_line.append(str(dic_cols[col]["medians"][i]) + " [" + str(dic_cols[col]["mins"][i]) + ", " +
                        str(dic_cols[col]["maxs"][i]) + "]" )
-        missing_line.append(str(dic_cols[col]["missing"][i]) + " (" + str(round(dic_cols[col]["perc"][i],1))+"%)")
+        missing_line.append(str(dic_cols[col]["missing"][i]) + " (" + str(100 - round(dic_cols[col]["perc"][i],1))+"%)")
     first_row.append("F(***) = " + str(round(dic_cols[col]["F-stat"],1)))
     if dic_cols[col]["pval"] < 0.05:
         first_row[-1] = first_row[-1] +"*"
@@ -152,9 +151,10 @@ def create_feature_set_of_rows_num(col, dic_cols, np2):
     #print(set_of_rows)
     return set_of_rows, dic_cols[col]["pval"]
 
-def create_feature_set_of_rows_cat(col, dic_df, data, dic_crosstab):
+def create_feature_set_of_rows_cat(col, dic_df, data, dic_crosstab): #se méfier des missing values !!
 
     nb_split = len(list(dic_df.keys()))
+    print(nb_split)
     if len(data[col].unique()) == 2 or col =="Female": #attention hardcoded mauvaise gestion des nan
         set_of_rows = []
         first_row = [col]
@@ -230,6 +230,15 @@ def create_feature_set_of_rows_cat(col, dic_df, data, dic_crosstab):
         print(set_of_rows)
         return set_of_rows, dic_crosstab[col][-2]
 
+def drop_na_split(data, split_variable, suppl_to_drop=[]):
+    data.dropna(subset=[split_variable], inplace=True)
+    if len(suppl_to_drop)>0:
+        print("here")
+        for val in suppl_to_drop:
+            print(val)
+            data = data[data[split_variable] != val]
+    return data
+
 
 if __name__ == "__main__":
     split_variable = "tschq-nap"
@@ -238,19 +247,26 @@ if __name__ == "__main__":
     # Avoiding path issues related to different OS
     data = pd.read_csv(FILENAME, sep=";", encoding="latin1")
 
+    print(len(data))
+    #first step : drop all lines that have nans in the split_variable column :
+    data = drop_na_split(data, split_variable, suppl_to_drop=[3])
+    print(len(data))
+
     #Regrouping naps groups in 3 groups : worsens, improves and nothing changes
 
     num_cols = config.JS_num_cols
-    cat_cols = config.JS_already_categorical
+    cat_cols = config.JS_categorical_essential
 
 
     #extracting datas for numerical cols
-    dic_df = split_database_col(data, split_variable, exclude=[3])
+    dic_df = split_database_col(data, split_variable)
+    print(dic_df.keys())
     dic_cols = get_mean_std_num_cols(dic_df, num_cols)
 
 
     # extracting datas for cat cols
-    #dic_crosstab = prepare_chi_squared(data, cat_cols, split_variable)
+    dic_crosstab = prepare_chi_squared(data, cat_cols, split_variable)
+    print(dic_crosstab)
 
     #Creating and completing table for csv export
     table=[["", "Worsens (N= "+str(len(dic_df[0]))+ " )",	"No effect (N= "+str(len(dic_df[2]))+" )", "Improves (N= "+str(len(dic_df[1]))+" )",	"Statistic", "P-Value",	"Effect size"]]
@@ -260,12 +276,13 @@ if __name__ == "__main__":
         next_line, p_val = create_feature_set_of_rows_num(col, dic_cols, get_anova_and_eta_squared(data, col, split_variable))
         table.extend(next_line)
         li_pvals.append(p_val)
-    #for col in cat_cols:
+    for col in cat_cols:
         #print(col)
-    #    next_line, p_val=create_feature_set_of_rows_cat(col, dic_df, data, dic_crosstab)
-    #    if next_line!=0:
-    #        table.extend(next_line)
-    #        li_pvals.append(p_val)
+        next_line, p_val=create_feature_set_of_rows_cat(col, dic_df, data, dic_crosstab)
+        if next_line!=0:
+            table.extend(next_line)
+            li_pvals.append(p_val)
+
 
     #Dealing with holm correction
     p_bool, p_adj, p_Sidak, p_alpha_adj = multipletests(li_pvals, alpha=0.05, method='holm')
