@@ -56,20 +56,40 @@ def split_database_col(df,col, exclude=[]):
 def get_anova_and_eta_squared(df, num_col, ref_col):
     return pingouin.anova(data=df, dv=num_col, between=ref_col, effsize="np2")["np2"][0]
 
-def prepare_chi_squared(df, cat_cols, ref_col):
+def prepare_chi_squared(df, cat_cols, ref_col, split_sizes):
 
     dic_output={}
     for col in cat_cols:
         crosstab = pd.crosstab(df[col], df[ref_col], margins=True)
+        print(crosstab)
         ind1 = len(df[col].unique())
+        uni = list(df[col].unique())
+        for elm in uni:
+            if str(elm)=="nan":
+                ind1 = ind1-1
+
         ind2 = len(df[ref_col].unique())
 
-        missing = [0,0,0]
+        missing = []
 
         if (col == "Female"):
             ind1 = ind1-1  #car il y a des np.nan dans unique()
             missing = [9, 19, 8]
         value = np.array([crosstab.iloc[i][0:ind2].values for i in range(ind1)]) #attention hardcoded
+        print("here comes value")
+        print(value)
+        head_count = np.array(crosstab.iloc[ind1][0:ind2].values )  # attention hardcoded
+        print("here comes head_count")
+        print(head_count)
+        if len(head_count)!= len(split_sizes):
+            print("head_count et split_sizes n'ont pas la même taille, il y a une erreur")
+            return  0
+        for i in range(len(head_count)):
+            missing.append(split_sizes[i]-head_count[i])
+
+        for i in range(len(head_count)): #on rajoute les pourcentages
+            missing.append(100*(split_sizes[i]-head_count[i])/split_sizes[i])
+
 
         chi2 = stats.chi2_contingency(value)
         #print(chi2)
@@ -110,7 +130,7 @@ def get_mean_std_num_cols(dic_df, num_cols):
             dic_cols[col]["maxs"].append(np.max(dic_df[X][col].dropna()))
             missing = dic_df[X][col].isnull().sum()
             dic_cols[col]["missing"].append(missing)
-            dic_cols[col]["perc"].append((len(dic_df[X][col])-missing)*100/len(dic_df[X][col]))
+            dic_cols[col]["perc"].append((missing)*100/len(dic_df[X][col]))
             li_df.append(dic_df[X][col].dropna())
         if len(li_df) == 3: #Beware : hardcoded
             dic_cols[col]["F-stat"], dic_cols[col]["pval"] = stats.f_oneway(li_df[0], li_df[1], li_df[2])
@@ -134,7 +154,7 @@ def create_feature_set_of_rows_num(col, dic_cols, np2):
         mean_line.append(str(round(dic_cols[col]["means"][i], 1)) + " (" + str(round(dic_cols[col]["stds"][i], 2)) + ")")
         median_line.append(str(dic_cols[col]["medians"][i]) + " [" + str(dic_cols[col]["mins"][i]) + ", " +
                        str(dic_cols[col]["maxs"][i]) + "]" )
-        missing_line.append(str(dic_cols[col]["missing"][i]) + " (" + str(100 - round(dic_cols[col]["perc"][i],1))+"%)")
+        missing_line.append(str(dic_cols[col]["missing"][i]) + " (" + str(round(dic_cols[col]["perc"][i],1))+"%)")
     first_row.append("F(***) = " + str(round(dic_cols[col]["F-stat"],1)))
     if dic_cols[col]["pval"] < 0.05:
         first_row[-1] = first_row[-1] +"*"
@@ -151,7 +171,7 @@ def create_feature_set_of_rows_num(col, dic_cols, np2):
     #print(set_of_rows)
     return set_of_rows, dic_cols[col]["pval"]
 
-def create_feature_set_of_rows_cat(col, dic_df, data, dic_crosstab): #se méfier des missing values !!
+def create_feature_set_of_rows_cat(col, dic_df, data, dic_crosstab): #se méfier des missing values !! #supprimer les nan comme catégorie
 
     nb_split = len(list(dic_df.keys()))
     print(nb_split)
@@ -190,6 +210,7 @@ def create_feature_set_of_rows_cat(col, dic_df, data, dic_crosstab): #se méfier
     else: #case for the non-binary columns
         print(col)
         choices = sorted(list(data[col].unique()))
+        print("here are the choices :")
         print(choices)
         print()
         print(dic_crosstab[col])
@@ -199,7 +220,7 @@ def create_feature_set_of_rows_cat(col, dic_df, data, dic_crosstab): #se méfier
         first_row = [col]
         print(int((len(dic_crosstab[col]) - 6 )/ 3))
         many_line = [[str(choices[i])] for i in range(int((len(dic_crosstab[col]) - 6 )/ 3))]
-        missing_line = ["Missing", "0 (100%)","0 (100%)","0 (100%)"]
+        missing_line = ["Missing"]
 
 
 
@@ -212,7 +233,8 @@ def create_feature_set_of_rows_cat(col, dic_df, data, dic_crosstab): #se méfier
                 many_line[var].append(str(dic_crosstab[col][i+var*3]) + " (" + str(
                     round(dic_crosstab[col][i+var*3] * 100 / (denoms),
                           1)) + "%)")
-
+            missing_line.append(
+                str(dic_crosstab[col][i-9]) + " (" + str(round(dic_crosstab[col][i-6], 1)) + "%)")
 
         first_row.append("Chi2(***) = " + str(round(dic_crosstab[col][-3], 1)))
         if dic_crosstab[col][-2] < 0.05:
@@ -263,9 +285,10 @@ if __name__ == "__main__":
     print(dic_df.keys())
     dic_cols = get_mean_std_num_cols(dic_df, num_cols)
 
-
+    split_sizes = [len(dic_df[i]) for i in range(len(dic_df))]
+    print(split_sizes)
     # extracting datas for cat cols
-    dic_crosstab = prepare_chi_squared(data, cat_cols, split_variable)
+    dic_crosstab = prepare_chi_squared(data, cat_cols, split_variable, split_sizes)
     print(dic_crosstab)
 
     #Creating and completing table for csv export
