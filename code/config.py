@@ -45,9 +45,9 @@ JS_categorical_essential = [ 'sex',  'tschq-psychiatry', 'tschq-neckpain',
                            'tschq-tmj', 'tschq-vertigo', 'tschq-headache', 'tschq-noise-pain', 'tschq-hyperacusis',
                            'tschq-ha', 'tschq-hearproblems', 'tschq-stress', 'tschq-sleep',
                            'tschq-somatic', 'tschq-sounds-worsen-tinnitus', 'tschq-sounds-suppress-tinnitus',
-                           'tschq-n-treatments', 'tschq-tinpitch', 'tschq-tintype', 'tschq-fluctuations',
+                           'tschq-n-treatments', 'tschq-tinpitch', 'tschq-tintype', 'tschq-tinside', 'tschq-fluctuations',
                            'tschq-intermitent', 'tschq-pulsating', 'tschq-cause', 'tschq-innital-perception',
-                           'tschq-familiy' ]
+                           'tschq-familiy', "tinnitus_laterality" ]
 JS_already_categorical =  [ 'mdi_1', 'mdi_2', 'mdi_3', 'mdi_4', 'mdi_5', 'mdi_6', 'mdi_7', 'mdi_8a',
                            'mdi_8b', 'mdi_9', 'mdi_10a', 'mdi_10b',  'tfi_1', 'tfi_2', 'tfi_3', 'tfi_4',
                            'tfi_5', 'tfi_6', 'tfi_7', 'tfi_8', 'tfi_9', 'tfi_10', 'tfi_11', 'tfi_12', 'tfi_13',
