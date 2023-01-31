@@ -269,21 +269,22 @@ def drop_na_split(data, split_variable, suppl_to_drop=[]):
 
 
 if __name__ == "__main__":
-    split_variable = "tschq-nap"
+    split_variable = "InflNap"
     DIRECTORY = "D:\Documents\Thèse EDISCE\TinniNap_DB_study\data"
-    FILENAME = os.path.join(DIRECTORY, "Jorge_Straudinger_data_clean_v2.csv")
+    FILENAME = os.path.join(DIRECTORY, "merge_final_v1.csv")
     # Avoiding path issues related to different OS
     data = pd.read_csv(FILENAME, sep=";", encoding="latin1")
 
     print(len(data))
     #first step : drop all lines that have nans in the split_variable column :
-    data = drop_na_split(data, split_variable, suppl_to_drop=[3])
+    data = drop_na_split(data, split_variable, suppl_to_drop=[])
     print(len(data))
+
 
     #Regrouping naps groups in 3 groups : worsens, improves and nothing changes
 
-    num_cols = config.JS_num_cols
-    cat_cols = config.JS_categorical_essential
+    num_cols = config.merge_num
+    cat_cols = config.merge_categ
 
 
     #extracting datas for numerical cols
@@ -325,6 +326,6 @@ if __name__ == "__main__":
 
     #saving csv
     os.chdir("D:/Documents/Thèse EDISCE/TinniNap_DB_study/figures")
-    with open(split_variable+"_table.csv", "w", newline="") as f:
+    with open(split_variable+"_table_merged_DB.csv", "w", newline="") as f:
         writer = csv.writer(f)
         writer.writerows(table)

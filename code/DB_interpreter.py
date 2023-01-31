@@ -6,6 +6,8 @@ import scipy.stats as stats
 import pingouin
 import csv
 from statsmodels.sandbox.stats.multicomp import multipletests
+import scikit_posthocs as sp
+import copy
 
 
 
@@ -52,7 +54,7 @@ def get_anova_and_eta_squared(df, num_col, ref_col):
     return pingouin.anova(data=df, dv=num_col, between=ref_col, effsize="np2")["np2"][0]
 
 def prepare_chi_squared(df, cat_cols, ref_col):
-
+    dic_post_hoc={}
     dic_output={}
     for col in cat_cols:
         crosstab = pd.crosstab(df[col], df[ref_col], margins=True)
@@ -66,8 +68,25 @@ def prepare_chi_squared(df, cat_cols, ref_col):
             missing = [9, 19, 8]
         value = np.array([crosstab.iloc[i][0:ind2].values for i in range(ind1)]) #attention hardcoded
 
+
+
         chi2 = stats.chi2_contingency(value)
-        #print(chi2)
+        if chi2[1] < 0.05 : #on conduit les post_hoc tests ATTENTION HARDCODED
+            copy_cross = copy.copy(crosstab)
+            copy_cross.drop(copy_cross.columns[1], axis=1, inplace=True)
+            #print(copy_cross)
+            #print(crosstab)
+
+            value_12 = np.array([crosstab.iloc[i][0:2].values for i in range(ind1)])
+            value_23 = np.array([crosstab.iloc[i][1:3].values for i in range(ind1)])
+            value_13 = np.array([copy_cross.iloc[i][0:2].values for i in range(ind1) ])
+
+            dic_post_hoc[col]= {}
+            dic_post_hoc[col]["post-hoc"]=[[[-1,0],stats.chi2_contingency(value_12)[1]],
+                                [[0, 1], stats.chi2_contingency(value_23)[1]],
+                                [[-1, 1], stats.chi2_contingency(value_13)[1]]
+                                ]
+            print(dic_post_hoc)
 
         cramerV = np.sqrt(chi2[0]/(chi2[2]*len(df)))   # source : https://www.statology.org/effect-size-chi-square/
         dic_output[col] = [value[i][j] for i in range(len(value)) for j in range(len(value[0])) ]
@@ -76,7 +95,7 @@ def prepare_chi_squared(df, cat_cols, ref_col):
         dic_output[col].append(chi2[1])#p-val
         dic_output[col].append(cramerV)
 
-    return dic_output
+    return dic_output, dic_post_hoc
 
 def get_mean_std_num_cols(dic_df, num_cols):
     """ Generates n smaller df from an initial df for each n different values of column col. Must be used for
@@ -93,9 +112,10 @@ def get_mean_std_num_cols(dic_df, num_cols):
             """
     dic_cols = {}
     for col in num_cols:
-        dic_cols[col] = { "order_vals":[],"means":[], "stds":[], "medians":[], "F-stat" : -1, "pval" : -1, "mins" : [], "maxs" : [], "missing":[], "perc":[]}
+        dic_cols[col] = { "order_vals":[],"means":[], "stds":[], "medians":[], "F-stat" : -1, "pval" : -1, "mins" : [],
+                          "maxs" : [], "missing":[], "perc":[], "post-hoc":-1}
         li_df=[]
-        print(list(dic_df.keys()))
+
         for X in list(dic_df.keys()):
             dic_cols[col]["order_vals"].append(X)
             dic_cols[col]["means"].append(np.mean(dic_df[X][col].dropna()))
@@ -110,6 +130,18 @@ def get_mean_std_num_cols(dic_df, num_cols):
 
         if len(li_df) == 3: #Beware : hardcoded
             dic_cols[col]["F-stat"], dic_cols[col]["pval"] = stats.f_oneway(li_df[0], li_df[1], li_df[2])
+            if dic_cols[col]["pval"] < 0.05 :
+                #print(col)
+                dunn_test = sp.posthoc_dunn([list(li_df[0]), list(li_df[1]), list(li_df[2])])
+                dic_cols[col]["post-hoc"] = [[[dic_cols[col]["order_vals"][0], dic_cols[col]["order_vals"][1]], dunn_test[1][2]],
+                                             [[dic_cols[col]["order_vals"][1], dic_cols[col]["order_vals"][2]],
+                                              dunn_test[2][3]],
+                                             [[dic_cols[col]["order_vals"][0], dic_cols[col]["order_vals"][2]],
+                                              dunn_test[1][3]]]
+
+                #print(dunn_test)
+                #print(dic_cols[col]["order_vals"])
+                #print(dic_cols[col]["post-hoc"])
         if len(li_df) == 2: #Beware : hardcoded
             dic_cols[col]["F-stat"], dic_cols[col]["pval"] = stats.f_oneway(li_df[0], li_df[1])
 
@@ -136,7 +168,9 @@ def create_feature_set_of_rows_num(col, dic_cols, np2):
         first_row[-1] = first_row[-1] +"*"
     first_row.append(dic_cols[col]["pval"])
     first_row.append(round(np2,3))
-    for i in range(3):
+    first_row.append("")
+    first_row.append("")
+    for i in range(5):
         mean_line.append("")
         median_line.append("")
         missing_line.append("")
@@ -170,8 +204,10 @@ def create_feature_set_of_rows_cat(col, dic_df, data, dic_crosstab):
             first_row[-1] = first_row[-1] +"*"
         first_row.append(dic_crosstab[col][-2])
         first_row.append(round(dic_crosstab[col][-1],3))
+        first_row.append("")
+        first_row.append("")
 
-        for i in range(3):
+        for i in range(5):
             Yes_line.append("")
             No_line.append("")
             missing_line.append("")
@@ -187,8 +223,7 @@ def create_feature_set_of_rows_cat(col, dic_df, data, dic_crosstab):
         choices = sorted(list(data[col].unique()))
         print(choices)
         print()
-        print(dic_crosstab[col])
-        print(len(dic_crosstab[col]))
+
 
         set_of_rows = []
         first_row = [col]
@@ -214,10 +249,14 @@ def create_feature_set_of_rows_cat(col, dic_df, data, dic_crosstab):
             first_row[-1] = first_row[-1] + "*"
         first_row.append(dic_crosstab[col][-2])
         first_row.append(round(dic_crosstab[col][-1], 3))
-        for i in range(3):
+        first_row.append("")
+        first_row.append("")
+        for i in range(5):
             for var in range(int((len(dic_crosstab[col]) - 6) / 3)):
                 many_line[var].append("")
 
+            missing_line.append("")
+            missing_line.append("")
             missing_line.append("")
         set_of_rows.append(first_row)
         set_of_rows.extend(many_line)
@@ -225,9 +264,64 @@ def create_feature_set_of_rows_cat(col, dic_df, data, dic_crosstab):
         print(set_of_rows)
         return set_of_rows, dic_crosstab[col][-2]
 
+def add_post_hoc(table, dic_cols, dic_cols2, num_cols, cat_cols):
+    correc_pvals=[]
+    compt_ps=0
+    #first step : aggregating p_vals for correction
+    for i in range(len(table)):
+        row = table[i]
+        if row[-5]!="" and row[-5]!="Statistic":
+            col = row[-2]
+            if row[-4] < 0.05 :
+                if num_cols.__contains__(col):
+                    correc_pvals.append(dic_cols[col]["post-hoc"][0][1])
+                    dic_cols[col]["post-hoc"][0][1] = len(correc_pvals)-1 # on écrit dans le dic l'indice de la p-val
+                    correc_pvals.append(dic_cols[col]["post-hoc"][2][1])
+                    dic_cols[col]["post-hoc"][2][1] = len(correc_pvals) - 1  # on écrit dans le dic l'indice de la p-val
+                    correc_pvals.append(dic_cols[col]["post-hoc"][1][1])
+                    dic_cols[col]["post-hoc"][1][1] = len(correc_pvals) - 1  # on écrit dans le dic l'indice de la p-val
+                    compt_ps+=3
+
+                if cat_cols.__contains__(col):
+                    correc_pvals.append(dic_cols2[col]["post-hoc"][0][1])
+                    dic_cols2[col]["post-hoc"][0][1] = len(correc_pvals) - 1  # on écrit dans le dic l'indice de la p-val
+                    correc_pvals.append(dic_cols2[col]["post-hoc"][1][1])
+                    dic_cols2[col]["post-hoc"][1][1] = len(correc_pvals) - 1  # on écrit dans le dic l'indice de la p-val
+                    correc_pvals.append(dic_cols2[col]["post-hoc"][2][1])
+                    dic_cols2[col]["post-hoc"][2][1] = len(correc_pvals) - 1  # on écrit dans le dic l'indice de la p-val
+                    compt_ps += 3
+
+    p_bool, p_adj, p_Sidak, p_alpha_adj = multipletests(correc_pvals, alpha=0.05, method='holm')
+
+    #p_adj contient les p-valeurs corrigées
+
+    #second step : writing p_vals in table
+    for i in range(len(table)):
+        row = table[i]
+        if row[-5]!="" and row[-5]!="Statistic":
+            col = row[-2]
+            if row[-4] < 0.05 :
+                if num_cols.__contains__(col):
+
+                    table[i+1][-2]="Worsens VS No effect"
+                    table[i + 1][-1] = p_adj[dic_cols[col]["post-hoc"][0][1]]
+                    table[i + 2][-2] = "Improves VS No effect"
+                    table[i + 2][-1] = p_adj[dic_cols[col]["post-hoc"][2][1]] #attention: indices inversés, surveiller dic_col
+                    table[i + 3][-2] = "Worsens VS Improves"
+                    table[i + 3][-1] = p_adj[dic_cols[col]["post-hoc"][1][1]] #attention: indices inversés, surveiller dic_col
+
+                if cat_cols.__contains__(col):
+
+                    table[i+1][-2]="Worsens VS No effect"
+                    table[i + 1][-1] = p_adj[dic_cols2[col]["post-hoc"][0][1]]
+                    table[i + 2][-2] = "Improves VS No effect"
+                    table[i + 2][-1] = p_adj[dic_cols2[col]["post-hoc"][1][1]]
+                    table[i + 3][-2] = "Worsens VS Improves"
+                    table[i + 3][-1] = p_adj[dic_cols2[col]["post-hoc"][2][1]]
+    return table
 
 if __name__ == "__main__":
-    split_variable = "on_off_split"
+    split_variable = "InflNap"
     DIRECTORY = "D:\Documents\Thèse EDISCE\TinniNap_DB_study\data"
     FILENAME = os.path.join(DIRECTORY, "sarah_michiels_v3_with_missing_with_true_on-off.csv")
     # Avoiding path issues related to different OS
@@ -252,32 +346,38 @@ if __name__ == "__main__":
     dic_cols = get_mean_std_num_cols(dic_df, num_cols)
 
     # extracting datas for cat cols
-    dic_crosstab = prepare_chi_squared(data, cat_cols, split_variable)
+    dic_crosstab, dic_post_hoc = prepare_chi_squared(data, cat_cols, split_variable)
 
     #Creating and completing table for csv export
-    table=[["", "Worsens (N= "+str(len(dic_df[-1]))+ " )",	"No effect (N= "+str(len(dic_df[0]))+" )", "Improves (N= "+str(len(dic_df[1]))+" )",	"Statistic", "P-Value",	"Effect size"]]
+    table=[["", "Worsens (N= "+str(len(dic_df[-1]))+ " )",	"No effect (N= "+str(len(dic_df[0]))+" )",
+            "Improves (N= "+str(len(dic_df[1]))+" )",	"Statistic", "P-Value",	"Effect size", "","Post-hoc test"]]
     li_pvals=[]
+    col_p_vals=[]
     for col in num_cols:
         next_line, p_val = create_feature_set_of_rows_num(col, dic_cols, get_anova_and_eta_squared(data, col, split_variable))
         table.extend(next_line)
         li_pvals.append(p_val)
+        col_p_vals.append(col)
     for col in cat_cols:
         #print(col)
         next_line, p_val=create_feature_set_of_rows_cat(col, dic_df, data, dic_crosstab)
         if next_line!=0:
             table.extend(next_line)
             li_pvals.append(p_val)
+            col_p_vals.append(col)
 
     #Dealing with holm correction
     p_bool, p_adj, p_Sidak, p_alpha_adj = multipletests(li_pvals, alpha=0.05, method='holm')
     count_p=0
     for row in table:
-        if row[-3]!="" and row[-3]!="Statistic":
+        if row[-5]!="" and row[-5]!="Statistic":
             if p_bool[count_p]:
-                row[-3]=row[-3]+"*"
-            row[-2] = p_adj[count_p] #replaces the p-vals by the corrected p-values
+                row[-5]=row[-5]+"*"
+            row[-4] = p_adj[count_p] #replaces the p-vals by the corrected p-values
+            row[-2] = col_p_vals[count_p]
             count_p+=1
 
+    table = add_post_hoc(table, dic_cols, dic_post_hoc, num_cols, cat_cols)
     #saving csv
     os.chdir("D:/Documents/Thèse EDISCE/TinniNap_DB_study/figures")
     with open(split_variable+"_table.csv", "w", newline="") as f:
