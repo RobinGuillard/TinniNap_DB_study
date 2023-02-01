@@ -62,9 +62,9 @@ JS_already_categorical =  [ 'mdi_1', 'mdi_2', 'mdi_3', 'mdi_4', 'mdi_5', 'mdi_6'
                            'tq_41', 'tq_42', 'tq_43', 'tq_44', 'tq_45', 'tq_46', 'tq_47', 'tq_48', 'tq_49', 'tq_50',
                            'tq_51', 'tq_52']
 
-merge_num=["TimeTin-months","Female","Age",	"MeanLoudness",	"MeanAnnoyancePastWeek","AwarenessOpenEnded"
+merge_num=["TimeTin-months","Age",	"MeanLoudness",	"MeanAnnoyancePastWeek","AwarenessOpenEnded"
 ]
-merge_categ=["cause_head_or_neck_injury", "cause_Psychological (stress, anxiety, depression)", "cause_Noise trauma",
+merge_categ=["Female","cause_head_or_neck_injury", "cause_Psychological (stress, anxiety, depression)", "cause_Noise trauma",
              "Cause_change_hearing",
              "ReactSound_Worse",	"HearingLoss",	"pain_cervical", "Headache_YesorNo",	"Tin_somato",	"TMJ_problem",
              "TinType_A pure tone / single pitch", "TinType_A whooshing noise - not in time with the pulse", "tin_puls",

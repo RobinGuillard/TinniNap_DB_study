@@ -1,14 +1,11 @@
-import os
+
 import pandas as pd
-import config
-import useful_func
 import numpy as np
 import scipy.stats as stats
 import pingouin
-import csv
+import copy
 from statsmodels.sandbox.stats.multicomp import multipletests
 import scikit_posthocs as sp
-import copy
 
 
 
@@ -31,7 +28,7 @@ def merging_groups(df, col, values_to_replace):
             df[col][index] = values_to_replace[str(df[col][index])]
     return df
 
-def split_database_col(df,col):
+def split_database_col(df,col, exclude=[]):
     """ Generates n smaller df from an initial df for each n different values of column col. Must be used for
     categorical col
 
@@ -41,12 +38,17 @@ def split_database_col(df,col):
             Initial dataframe
         col: string,
             Name of the column of the split
+        exclude : optional
+            Values to exclude from the split
         Returns
         dic_df : python dictionnary
         a dictionnary where the keys are the split col values and the values are the partial databases
         """
     dic_df = {}
-    keys = df[col].unique()
+    keys = list(df[col].unique())
+    if len(exclude)>0:
+        for excl in exclude:
+            keys.remove(excl)
     for elm in keys :
         dic_df[elm] = df[df[col] == elm]
     return dic_df
@@ -54,24 +56,41 @@ def split_database_col(df,col):
 def get_anova_and_eta_squared(df, num_col, ref_col):
     return pingouin.anova(data=df, dv=num_col, between=ref_col, effsize="np2")["np2"][0]
 
-def prepare_chi_squared(df, cat_cols, ref_col):
-    dic_post_hoc={}
+def prepare_chi_squared(df, cat_cols, ref_col, split_sizes):
+    dic_post_hoc = {}
     dic_output={}
     for col in cat_cols:
+        print(col)
         crosstab = pd.crosstab(df[col], df[ref_col], margins=True)
         ind1 = len(df[col].unique())
+        uni = list(df[col].unique())
+        for elm in uni:
+            if str(elm)=="nan":
+                ind1 = ind1-1
+
         ind2 = len(df[ref_col].unique())
 
-        missing = [0,0,0]
+        missing = []
 
         if (col == "Female"):
-            ind1 = ind1-1  #car il y a des np.nan dans unique()
             missing = [9, 19, 8]
         value = np.array([crosstab.iloc[i][0:ind2].values for i in range(ind1)]) #attention hardcoded
 
+        head_count = np.array(crosstab.iloc[ind1][0:ind2].values )  # attention hardcoded
+
+        if len(head_count)!= len(split_sizes):
+            print("head_count et split_sizes n'ont pas la même taille, il y a une erreur")
+            return  0
+        for i in range(len(head_count)):
+            missing.append(split_sizes[i]-head_count[i])
+
+        for i in range(len(head_count)): #on rajoute les pourcentages
+            missing.append(100*(split_sizes[i]-head_count[i])/split_sizes[i])
 
 
         chi2 = stats.chi2_contingency(value)
+        #print(chi2)
+
         if chi2[1] < 0.05 : #on conduit les post_hoc tests ATTENTION HARDCODED
             copy_cross = copy.copy(crosstab)
             copy_cross.drop(copy_cross.columns[1], axis=1, inplace=True)
@@ -116,8 +135,8 @@ def get_mean_std_num_cols(dic_df, num_cols):
         dic_cols[col] = { "order_vals":[],"means":[], "stds":[], "medians":[], "F-stat" : -1, "pval" : -1, "mins" : [],
                           "maxs" : [], "missing":[], "perc":[], "post-hoc":-1}
         li_df=[]
-
-        for X in list(dic_df.keys()):
+        keys = list(dic_df.keys())
+        for X in list(keys):
             dic_cols[col]["order_vals"].append(X)
             dic_cols[col]["means"].append(np.mean(dic_df[X][col].dropna()))
             dic_cols[col]["stds"].append(np.std(dic_df[X][col].dropna()))
@@ -126,32 +145,29 @@ def get_mean_std_num_cols(dic_df, num_cols):
             dic_cols[col]["maxs"].append(np.max(dic_df[X][col].dropna()))
             missing = dic_df[X][col].isnull().sum()
             dic_cols[col]["missing"].append(missing)
-            dic_cols[col]["perc"].append((len(dic_df[X][col])-missing)*100/len(dic_df[X][col]))
+            dic_cols[col]["perc"].append((missing)*100/len(dic_df[X][col]))
             li_df.append(dic_df[X][col].dropna())
 
         if len(li_df) == 3: #Beware : hardcoded
-            dic_cols[col]["F-stat"], dic_cols[col]["pval"] = stats.f_oneway(li_df[0], li_df[1], li_df[2])
-            if dic_cols[col]["pval"] < 0.05 :
-                #print(col)
+            dic_cols[col]["F-stat"], dic_cols[col]["pval"] = stats.kruskal(li_df[0], li_df[1], li_df[2])
+            if dic_cols[col]["pval"] < 0.05:
+                # print(col)
                 dunn_test = sp.posthoc_dunn([list(li_df[0]), list(li_df[1]), list(li_df[2])])
-                dic_cols[col]["post-hoc"] = [[[dic_cols[col]["order_vals"][0], dic_cols[col]["order_vals"][1]], dunn_test[1][2]],
-                                             [[dic_cols[col]["order_vals"][1], dic_cols[col]["order_vals"][2]],
-                                              dunn_test[2][3]],
-                                             [[dic_cols[col]["order_vals"][0], dic_cols[col]["order_vals"][2]],
-                                              dunn_test[1][3]]]
-
-                #print(dunn_test)
-                #print(dic_cols[col]["order_vals"])
-                #print(dic_cols[col]["post-hoc"])
-        if len(li_df) == 2: #Beware : hardcoded
-            dic_cols[col]["F-stat"], dic_cols[col]["pval"] = stats.f_oneway(li_df[0], li_df[1])
+                dic_cols[col]["post-hoc"] = [
+                    [[dic_cols[col]["order_vals"][0], dic_cols[col]["order_vals"][1]], dunn_test[1][2]],
+                    [[dic_cols[col]["order_vals"][1], dic_cols[col]["order_vals"][2]],
+                     dunn_test[2][3]],
+                    [[dic_cols[col]["order_vals"][0], dic_cols[col]["order_vals"][2]],
+                     dunn_test[1][3]]]
+        if len(li_df) == 2: #Beware : hardcoded, would only be useful if loche database
+            dic_cols[col]["F-stat"], dic_cols[col]["pval"] = stats.kruskal(li_df[0], li_df[1])
 
     return dic_cols
 
 def create_feature_set_of_rows_num(col, dic_cols, np2):
     nb_split = len(dic_cols[col]["order_vals"])
 
-    good_order = np.argsort(dic_cols[col]["order_vals"]) #should give the good order to parse the datas
+    good_order = list(np.argsort(dic_cols[col]["order_vals"])) #should give the good order to parse the datas
     #print(good_order)
     set_of_rows = []
     first_row = [col]
@@ -161,8 +177,8 @@ def create_feature_set_of_rows_num(col, dic_cols, np2):
     for i in good_order:
         first_row.append("")
         mean_line.append(str(round(dic_cols[col]["means"][i], 1)) + " (" + str(round(dic_cols[col]["stds"][i], 2)) + ")")
-        median_line.append(str(dic_cols[col]["medians"][i]) + " [" + str(dic_cols[col]["mins"][i]) + ", " +
-                       str(dic_cols[col]["maxs"][i]) + "]" )
+        median_line.append(str(round(dic_cols[col]["medians"][i],1)) + " [" + str(round(dic_cols[col]["mins"][i], 1)) + ", " +
+                       str(round(dic_cols[col]["maxs"][i], 1)) + "]" )
         missing_line.append(str(dic_cols[col]["missing"][i]) + " (" + str(round(dic_cols[col]["perc"][i],1))+"%)")
     first_row.append("F(***) = " + str(round(dic_cols[col]["F-stat"],1)))
     if dic_cols[col]["pval"] < 0.05:
@@ -182,7 +198,7 @@ def create_feature_set_of_rows_num(col, dic_cols, np2):
     #print(set_of_rows)
     return set_of_rows, dic_cols[col]["pval"]
 
-def create_feature_set_of_rows_cat(col, dic_df, data, dic_crosstab):
+def create_feature_set_of_rows_cat(col, dic_df, data, dic_crosstab): #se méfier des missing values !! #supprimer les nan comme catégorie
 
     nb_split = len(list(dic_df.keys()))
     if len(data[col].unique()) == 2 or col =="Female": #attention hardcoded mauvaise gestion des nan
@@ -220,17 +236,20 @@ def create_feature_set_of_rows_cat(col, dic_df, data, dic_crosstab):
         return set_of_rows, dic_crosstab[col][-2]
 
     else: #case for the non-binary columns
-        print(col)
-        choices = sorted(list(data[col].unique()))
-        print(choices)
-        print()
+        choices = list(data[col].unique())
+        choices_2 =[]
+        for elm in choices:
+            if str(elm)!="nan":
+                choices_2.append(elm)
+
+
+        choices_2 = sorted(choices_2)
 
 
         set_of_rows = []
         first_row = [col]
-        print(int((len(dic_crosstab[col]) - 9 )/ 3))
-        many_line = [[str(choices[i])] for i in range(int((len(dic_crosstab[col]) - 9 )/ 3))]
-        missing_line = ["Missing", "0 (100%)","0 (100%)","0 (100%)"]
+        many_line = [[str(choices_2[i])] for i in range(int((len(dic_crosstab[col]) - 9 )/ 3))]
+        missing_line = ["Missing"]
 
 
 
@@ -243,7 +262,10 @@ def create_feature_set_of_rows_cat(col, dic_df, data, dic_crosstab):
                 many_line[var].append(str(dic_crosstab[col][i+var*3]) + " (" + str(
                     round(dic_crosstab[col][i+var*3] * 100 / (denoms),
                           1)) + "%)")
-
+            print("relecture crosstab")
+            print(dic_crosstab[col])
+            missing_line.append(
+                str(dic_crosstab[col][i-9]) + " (" + str(round(dic_crosstab[col][i-6], 1)) + "%)")
 
         first_row.append("Chi2(***) = " + str(round(dic_crosstab[col][-3], 1)))
         if dic_crosstab[col][-2] < 0.05:
@@ -257,13 +279,18 @@ def create_feature_set_of_rows_cat(col, dic_df, data, dic_crosstab):
                 many_line[var].append("")
 
             missing_line.append("")
-            missing_line.append("")
-            missing_line.append("")
         set_of_rows.append(first_row)
         set_of_rows.extend(many_line)
         set_of_rows.append(missing_line)
-        print(set_of_rows)
         return set_of_rows, dic_crosstab[col][-2]
+
+def drop_na_split(data, split_variable, suppl_to_drop=[]):
+    data.dropna(subset=[split_variable], inplace=True)
+    if len(suppl_to_drop)>0:
+        for val in suppl_to_drop:
+
+            data = data[data[split_variable] != val]
+    return data
 
 def add_post_hoc(table, dic_cols, dic_cols2, num_cols, cat_cols):
     correc_pvals=[]
@@ -330,74 +357,3 @@ def write_p_val(pval):
         output=round(pval, 3)
     return(output)
 
-
-if __name__ == "__main__":
-    split_variable = "InflNap"
-    DIRECTORY = "D:\Documents\Thèse EDISCE\TinniNap_DB_study\data"
-    FILENAME = os.path.join(DIRECTORY, "sarah_michiels_v3_with_missing_with_true_on-off.csv")
-    # Avoiding path issues related to different OS
-    data = pd.read_csv(FILENAME, sep=",", encoding="latin1")
-
-    #Regrouping naps groups in 3 groups : worsens, improves and nothing changes
-    data = useful_func.merging_groups(data, "InflNap", {"-2" : -1, "2" : 1})
-    data = useful_func.merging_groups(data, "InflLightEx", {"-2": -1, "2": 1})
-    data = useful_func.merging_groups(data, "InflModerateWorkout", {"-2": -1, "2": 1})
-    data = useful_func.merging_groups(data, "InflIntenseworkout", {"-2" : -1, "2" : 1})
-    data = useful_func.merging_groups(data, "InflBadSleep", {"-2": -1, "2": 1})
-    data = useful_func.merging_groups(data, "InflGoodSleep", {"-2": -1, "2": 1})
-    data = useful_func.merging_groups(data, "InflAnxiety", {"-2": -1, "2": 1})
-    data = useful_func.merging_groups(data, "InflStress", {"-2": -1, "2": 1})
-    data = useful_func.merging_groups(data, "Female", {"2.0": np.nan})
-    num_cols = config.SM_num_cols
-    cat_cols = config.SM_already_categorical
-
-
-    #extracting datas for numerical cols
-    dic_df = useful_func.split_database_col(data, split_variable)
-    dic_cols = useful_func.get_mean_std_num_cols(dic_df, num_cols)
-
-    split_sizes = [len(dic_df[i-1]) for i in range(len(dic_df))]
-    print(split_sizes)
-    # extracting datas for cat cols
-    dic_crosstab, dic_post_hoc = useful_func.prepare_chi_squared(data, cat_cols, split_variable, split_sizes)
-
-    #Creating and completing table for csv export
-    table=[["", "Worsens (N= "+str(len(dic_df[-1]))+ " )",	"No effect (N= "+str(len(dic_df[0]))+" )",
-            "Improves (N= "+str(len(dic_df[1]))+" )",	"Statistic", "P-Value",	"Effect size", "","Post-hoc test"]]
-    li_pvals=[]
-    col_p_vals=[]
-    for col in num_cols:
-        next_line, p_val = useful_func.create_feature_set_of_rows_num(col, dic_cols, useful_func.get_anova_and_eta_squared(data, col, split_variable))
-        table.extend(next_line)
-        li_pvals.append(p_val)
-        col_p_vals.append(col)
-    for col in cat_cols:
-        #print(col)
-        next_line, p_val = useful_func.create_feature_set_of_rows_cat(col, dic_df, data, dic_crosstab)
-        if next_line!=0:
-            table.extend(next_line)
-            li_pvals.append(p_val)
-            col_p_vals.append(col)
-
-    #Dealing with holm correction
-    p_bool, p_adj, p_Sidak, p_alpha_adj = multipletests(li_pvals, alpha=0.05, method='holm')
-    count_p=0
-    for row in table:
-        if row[-5]!="" and row[-5]!="Statistic":
-            if p_bool[count_p]:
-                row[-5]=row[-5]+"*"
-            row[-4] = p_adj[count_p] #replaces the p-vals by the corrected p-values
-            row[-2] = col_p_vals[count_p]
-            count_p+=1
-
-    table = useful_func.add_post_hoc(table, dic_cols, dic_post_hoc, num_cols, cat_cols)
-
-    #dernière touche : arrondir les p_val des tests Kruskal-Wallis:
-    for row in table:
-        if row[-4]!="" and row[-4]!="P-Value":
-            row[-4] = useful_func.write_p_val(row[-4])
-    #saving csv
-    os.chdir("D:/Documents/Thèse EDISCE/TinniNap_DB_study/figures")
-    with open(split_variable+"_table.csv", "w", newline="") as f:
-        writer = csv.writer(f)
-        writer.writerows(table)
