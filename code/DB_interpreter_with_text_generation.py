@@ -406,6 +406,32 @@ if __name__ == "__main__":
                 recap_sign[row[0]].extend([table[i + 3][-3], table[i + 3][-2]])
                 recap_sign[row[0]].append(row[0])
 
+    recap_sign2 = []
+    for elm in recap_sign:
+        recap_sign2.append([recap_sign[elm], recap_sign[elm][1]])
+    recap_sign2.sort(key=lambda x: x[1])
+    recap_sign2.reverse()
+    print(recap_sign2)
+    print("")
+    for elm in recap_sign2:
+        if num_cols.__contains__(elm[0][-1]):
+            if elm[0][1] > 0.01:
+                print("Significative column : " + str(elm[0][-1]))
+                print("P-value : " + str(elm[0][0]))
+                print("Effect size : " + str(elm[0][1]))
+                print(elm[0][2] + " " + str(elm[0][3]))
+                print(elm[0][4] + " " + str(elm[0][5]))
+                print(elm[0][6] + " " + str(elm[0][7]))
+                print("")
+        if cat_cols.__contains__(elm[0][-1]):
+            if elm[0][1] > 0.04:
+                print("Significative column : " + str(elm[0][-1]))
+                print("P-value : " + str(elm[0][0]))
+                print("Effect size : " + str(elm[0][1]))
+                print(elm[0][2] + " " + str(elm[0][3]))
+                print(elm[0][4] + " " + str(elm[0][5]))
+                print(elm[0][6] + " " + str(elm[0][7]))
+                print("")
 
     table_short = [table[0]]
 
