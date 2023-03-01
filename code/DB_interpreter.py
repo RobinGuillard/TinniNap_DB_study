@@ -368,13 +368,13 @@ if __name__ == "__main__":
     li_pvals=[]
     col_p_vals=[]
     for col in num_cols:
-        next_line, p_val = useful_func.create_feature_set_of_rows_num(col, dic_cols, dic_cols[col]["eta-kruskal"])
+        next_line, p_val = useful_func.create_feature_set_of_rows_num(col, dic_cols, dic_cols[col]["eta-kruskal"], db="SM")
         table.extend(next_line)
         li_pvals.append(p_val)
         col_p_vals.append(col)
     for col in cat_cols:
         #print(col)
-        next_line, p_val = useful_func.create_feature_set_of_rows_cat(col, dic_df, data, dic_crosstab)
+        next_line, p_val = useful_func.create_feature_set_of_rows_cat(col, dic_df, data, dic_crosstab, db="SM")
         if next_line!=0:
             table.extend(next_line)
             li_pvals.append(p_val)

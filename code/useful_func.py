@@ -6,6 +6,7 @@ import pingouin
 import copy
 from statsmodels.sandbox.stats.multicomp import multipletests
 import scikit_posthocs as sp
+import config
 
 def cohen_d(x,y):
     nx = len(x)
@@ -198,13 +199,18 @@ def get_mean_std_num_cols(dic_df, num_cols):
 
     return dic_cols
 
-def create_feature_set_of_rows_num(col, dic_cols, np2):
+def create_feature_set_of_rows_num(col, dic_cols, np2, db=""):
     nb_split = len(dic_cols[col]["order_vals"])
 
     good_order = list(np.argsort(dic_cols[col]["order_vals"])) #should give the good order to parse the datas
     #print(good_order)
     set_of_rows = []
-    first_row = [col]
+    if db == "SM":
+        first_row = [config.SM_str_fields[col][0]]
+    elif db == "JS" :
+        first_row = [config.JS_str_fields[col][0]]
+    else:
+        first_row = [col]
     mean_line = ["Mean (SD)"]
     median_line =["Median [Min Max]"]
     missing_line=["Missing"]
@@ -214,7 +220,7 @@ def create_feature_set_of_rows_num(col, dic_cols, np2):
         median_line.append(str(round(dic_cols[col]["medians"][i],1)) + " [" + str(round(dic_cols[col]["mins"][i], 1)) + ", " +
                        str(round(dic_cols[col]["maxs"][i], 1)) + "]" )
         missing_line.append(str(dic_cols[col]["missing"][i]) + " (" + str(round(dic_cols[col]["perc"][i],1))+"%)")
-    first_row.append("F(***) = " + str(round(dic_cols[col]["F-stat"],1)))
+    first_row.append("H = " + str(round(dic_cols[col]["F-stat"],1)))
     if dic_cols[col]["pval"] < 0.05:
         first_row[-1] = first_row[-1] +"*"
     first_row.append(dic_cols[col]["pval"])
@@ -233,28 +239,30 @@ def create_feature_set_of_rows_num(col, dic_cols, np2):
     #print(set_of_rows)
     return set_of_rows, dic_cols[col]["pval"]
 
-def create_feature_set_of_rows_cat(col, dic_df, data, dic_crosstab): #se méfier des missing values !! #supprimer les nan comme catégorie
+def create_feature_set_of_rows_cat(col, dic_df, data, dic_crosstab, db=""): #se méfier des missing values !! #supprimer les nan comme catégorie
 
     nb_split = len(list(dic_df.keys()))
-
-
-
     choices = list(data[col].unique())
     choices_2 =[]
     for elm in choices:
         if str(elm)!="nan":
             choices_2.append(elm)
-
-
     choices_2 = sorted(choices_2)
-
-
     set_of_rows = []
-    first_row = [col]
-    many_line = [[str(choices_2[i])] for i in range(int((len(dic_crosstab[col]) - 9 )/ 3))]
+    if db == "SM":
+
+        first_row = [config.SM_str_fields[col][0]]
+        many_line = [[config.SM_str_fields[col][1][int(choices_2[i])]] for i in range(int((len(dic_crosstab[col]) - 9) / 3))]
+    elif db == "JS" :
+        print(col)
+        print(config.JS_str_fields[col][1])
+        first_row = [config.JS_str_fields[col][0]]
+        many_line = [[config.JS_str_fields[col][1][int(choices_2[i])]] for i in range(int((len(dic_crosstab[col]) - 9) / 3))]
+    else:
+        first_row = [col]
+        many_line = [[choices_2[i]] for i in range(int((len(dic_crosstab[col]) - 9) / 3))]
+
     missing_line = ["Missing"]
-
-
 
     for i in range(nb_split):
         first_row.append("")
@@ -270,7 +278,7 @@ def create_feature_set_of_rows_cat(col, dic_df, data, dic_crosstab): #se méfier
         missing_line.append(
             str(dic_crosstab[col][i-9]) + " (" + str(round(dic_crosstab[col][i-6], 1)) + "%)")
 
-    first_row.append("Chi2(***) = " + str(round(dic_crosstab[col][-3], 1)))
+    first_row.append("Chi2 = " + str(round(dic_crosstab[col][-3], 1)))
     if dic_crosstab[col][-2] < 0.05:
         first_row[-1] = first_row[-1] + "*"
     first_row.append(dic_crosstab[col][-2])
